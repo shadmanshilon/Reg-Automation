@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<title>QA Live Execution Dashboard</title>
+<style>
+  :root {
+    --bg:#0f1420; --card:#171d2e; --card2:#1d2439; --ink:#e6ebf5; --muted:#8b96b3;
+    --pass:#22c55e; --fail:#ef4444; --blocked:#f59e0b; --brand:#3b82f6; --border:#2a3350;
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink); font-family:Segoe UI,Arial,sans-serif; }
+  header { padding:20px 28px; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; }
+  header h1 { margin:0; font-size:18px; }
+  header .sub { color:var(--muted); font-size:12px; margin-top:4px; }
+  .pill { padding:5px 14px; border-radius:20px; font-size:12px; font-weight:700; letter-spacing:.03em; }
+  .pill.running { background:#1d3a8a; color:#bfdbfe; }
+  .pill.done { background:#14532d; color:#bbf7d0; }
+  .pill.lost { background:#7f1d1d; color:#fecaca; }
+  .wrap { max-width:1100px; margin:0 auto; padding:24px 20px 60px; display:grid; gap:18px; }
+  .progress-card { background:var(--card); border:1px solid var(--border); border-radius:12px; padding:18px 22px; }
+  .progress-top { display:flex; justify-content:space-between; align-items:baseline; margin-bottom:10px; }
+  .progress-top .n { font-size:26px; font-weight:700; }
+  .bar { height:10px; border-radius:6px; background:#0b0f1a; overflow:hidden; }
+  .bar > div { height:100%; background:linear-gradient(90deg,#3b82f6,#22c55e); transition:width .3s ease; }
+  .chips { display:flex; gap:10px; margin-top:12px; flex-wrap:wrap; }
+  .chip { font-size:12px; padding:4px 12px; border-radius:16px; font-weight:600; }
+  .chip.pass { background:rgba(34,197,94,.15); color:var(--pass); }
+  .chip.fail { background:rgba(239,68,68,.15); color:var(--fail); }
+  .chip.blocked { background:rgba(245,158,11,.15); color:var(--blocked); }
+  .grid2 { display:grid; grid-template-columns:1.3fr 1fr; gap:18px; }
+  @media (max-width:820px) { .grid2 { grid-template-columns:1fr; } }
+  .card { background:var(--card); border:1px solid var(--border); border-radius:12px; padding:18px 22px; }
+  .card h2 { margin:0 0 12px; font-size:13px; text-transform:uppercase; letter-spacing:.05em; color:var(--muted); }
+  .case-title { font-size:16px; font-weight:600; margin-bottom:2px; }
+  .case-id { color:var(--brand); font-weight:700; font-size:13px; }
+  .steps { list-style:none; padding:0; margin:14px 0 0; display:flex; flex-direction:column; gap:8px; max-height:220px; overflow-y:auto; }
+  .steps li { display:flex; gap:10px; align-items:flex-start; font-size:13px; padding:6px 10px; border-radius:8px; background:var(--card2); }
+  .steps li.running { outline:1px solid var(--brand); animation:pulse 1.4s infinite; }
+  .steps li.done { opacity:.6; }
+  .steps .ico { width:16px; text-align:center; }
+  @keyframes pulse { 0%,100% { box-shadow:0 0 0 0 rgba(59,130,246,.5);} 50% { box-shadow:0 0 0 5px rgba(59,130,246,0);} }
+  .banner { border-radius:10px; padding:12px 14px; font-size:13px; margin-top:10px; display:flex; gap:10px; align-items:center; background:var(--card2); border:1px solid var(--border); transition:transform .15s; }
+  .banner.flash { transform:scale(1.02); border-color:var(--brand); }
+  .banner .ico { font-size:16px; }
+  .assert-banner.pass { border-color:var(--pass); color:var(--pass); }
+  .assert-banner.fail { border-color:var(--fail); color:var(--fail); }
+  .muted { color:var(--muted); font-size:13px; }
+  .log { list-style:none; margin:0; padding:0; max-height:420px; overflow-y:auto; display:flex; flex-direction:column-reverse; gap:6px; font-size:12px; }
+  .log li { padding:6px 10px; border-radius:8px; background:var(--card2); display:flex; gap:8px; }
+  .log li .t { color:var(--muted); flex-shrink:0; }
+  .log li.step { border-left:3px solid var(--brand); }
+  .log li.action { border-left:3px solid #a78bfa; }
+  .log li.assert { border-left:3px solid var(--pass); }
+  .log li.result { border-left:3px solid #fff; font-weight:600; }
+  .log li.case { border-left:3px solid #f472b6; font-weight:600; }
+  .log li.session { border-left:3px solid var(--muted); }
+  footer { text-align:center; color:var(--muted); font-size:12px; padding:10px; }
+</style>
+</head>
+<body>
+<header>
+  <div>
+    <h1>QA Live Execution Dashboard</h1>
+    <div class="sub" id="metaLine">connecting…</div>
+  </div>
+  <div class="pill running" id="statusPill">CONNECTING</div>
+</header>
+<div class="wrap">
+  <div class="progress-card">
+    <div class="progress-top">
+      <div><span class="n" id="completedN">0</span> <span class="muted">/ <span id="totalN">0</span> test cases</span></div>
+      <div class="muted" id="pctLabel">0%</div>
+    </div>
+    <div class="bar"><div id="barFill" style="width:0%"></div></div>
+    <div class="chips">
+      <span class="chip pass" id="passChip">Passed 0</span>
+      <span class="chip fail" id="failChip">Failed 0</span>
+      <span class="chip blocked" id="blockedChip">Blocked 0</span>
+    </div>
+  </div>
+
+  <div class="grid2">
+    <div class="card">
+      <h2>Current Test Case</h2>
+      <div id="noCase" class="muted">Waiting for the first test case to start…</div>
+      <div id="caseBlock" style="display:none">
+        <div class="case-id" id="caseId">-</div>
+        <div class="case-title" id="caseTitle">-</div>
+        <ul class="steps" id="stepsList"></ul>
+
+        <div class="banner" id="actionBanner" style="display:none">
+          <span class="ico" id="actionIco">⚙️</span>
+          <span id="actionText">-</span>
+        </div>
+        <div class="banner assert-banner" id="assertBanner" style="display:none">
+          <span class="ico" id="assertIco">🔍</span>
+          <span id="assertText">-</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Live Log</h2>
+      <ul class="log" id="logList"></ul>
+    </div>
+  </div>
+</div>
+<footer id="footerNote"></footer>
+
+<script>
+const ICONS = { click: "🖱️", type: "⌨️", navigate: "🧭", verify: "🔍", info: "ℹ️" };
+let lastActionText = null, lastAssertText = null, failures = 0;
+
+function esc(s) {
+  const d = document.createElement('div');
+  d.textContent = s == null ? '' : String(s);
+  return d.innerHTML;
+}
+
+function render(state) {
+  const s = state.session, c = state.current;
+
+  document.getElementById('metaLine').textContent =
+    (s.app_url ? s.app_url + ' · ' : '') + (s.account ? 'Account: ' + s.account : '') +
+    (s.started_at ? ' · Started ' + s.started_at : '');
+
+  const pill = document.getElementById('statusPill');
+  if (s.status === 'running') { pill.textContent = 'RUNNING'; pill.className = 'pill running'; }
+  else if (s.status === 'done') { pill.textContent = 'COMPLETED'; pill.className = 'pill done'; }
+
+  document.getElementById('completedN').textContent = s.completed;
+  document.getElementById('totalN').textContent = s.total;
+  const pct = s.total ? Math.round((s.completed / s.total) * 100) : 0;
+  document.getElementById('pctLabel').textContent = pct + '%';
+  document.getElementById('barFill').style.width = pct + '%';
+  document.getElementById('passChip').textContent = 'Passed ' + s.passed;
+  document.getElementById('failChip').textContent = 'Failed ' + s.failed;
+  document.getElementById('blockedChip').textContent = 'Blocked ' + s.blocked;
+
+  if (!c || !c.case_id) {
+    document.getElementById('noCase').style.display = '';
+    document.getElementById('caseBlock').style.display = 'none';
+  } else {
+    document.getElementById('noCase').style.display = 'none';
+    document.getElementById('caseBlock').style.display = '';
+    document.getElementById('caseId').textContent = c.case_id + ' · ' + c.feature;
+    document.getElementById('caseTitle').textContent = c.title;
+
+    const stepsList = document.getElementById('stepsList');
+    stepsList.innerHTML = c.steps.map(st => {
+      const cls = st.status === 'running' ? 'running' : 'done';
+      const ico = st.status === 'running' ? '▶' : '✅';
+      return `<li class="${cls}"><span class="ico">${ico}</span><span>Step ${st.n}: ${esc(st.text)}</span></li>`;
+    }).join('');
+    stepsList.scrollTop = stepsList.scrollHeight;
+
+    const actionBanner = document.getElementById('actionBanner');
+    if (c.action) {
+      actionBanner.style.display = 'flex';
+      document.getElementById('actionIco').textContent = ICONS[c.action.kind] || ICONS.info;
+      document.getElementById('actionText').textContent = c.action.text;
+      if (c.action.text !== lastActionText) {
+        actionBanner.classList.add('flash');
+        setTimeout(() => actionBanner.classList.remove('flash'), 250);
+        lastActionText = c.action.text;
+      }
+    } else {
+      actionBanner.style.display = 'none';
+    }
+
+    const assertBanner = document.getElementById('assertBanner');
+    if (c.assertion) {
+      assertBanner.style.display = 'flex';
+      const passed = c.assertion.passed;
+      assertBanner.className = 'banner assert-banner ' + (passed ? 'pass' : 'fail');
+      document.getElementById('assertIco').textContent = passed ? '✅' : '❌';
+      document.getElementById('assertText').textContent = c.assertion.text;
+      if (c.assertion.text !== lastAssertText) {
+        assertBanner.classList.add('flash');
+        setTimeout(() => assertBanner.classList.remove('flash'), 250);
+        lastAssertText = c.assertion.text;
+      }
+    } else {
+      assertBanner.style.display = 'none';
+    }
+  }
+
+  const logList = document.getElementById('logList');
+  logList.innerHTML = state.log.slice().reverse().map(e =>
+    `<li class="${e.kind}"><span class="t">${e.t}</span><span>${esc(e.text)}</span></li>`
+  ).join('');
+
+  document.getElementById('footerNote').textContent = s.status === 'done'
+    ? 'Execution completed. Open reports/automation_report.html for the full report.'
+    : '';
+}
+
+async function poll() {
+  try {
+    const res = await fetch('/live_state.json', { cache: 'no-store' });
+    if (!res.ok) throw new Error('bad status');
+    const state = await res.json();
+    render(state);
+    failures = 0;
+  } catch (e) {
+    failures++;
+    if (failures > 5) {
+      const pill = document.getElementById('statusPill');
+      pill.textContent = 'CONNECTION LOST';
+      pill.className = 'pill lost';
+      document.getElementById('footerNote').textContent =
+        'Lost connection to the test runner - it may have finished. Open reports/automation_report.html.';
+    }
+  }
+}
+
+poll();
+setInterval(poll, 400);
+</script>
+</body>
+</html>
